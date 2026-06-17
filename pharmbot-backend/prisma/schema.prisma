@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String
+  name          String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  prescriptions Prescription[]
+
+  @@map("users")
+}
+
+model Prescription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName  String?
+  fileType  String?
+  filePath  String?
+  rawText   String?
+  drugs     String[] @default([])
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  report    Report?
+
+  @@map("prescriptions")
+}
+
+model Drug {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  genericName String?
+  drugClass   String?
+  description String?
+  uses        String[] @default([])
+  warnings    String[] @default([])
+  sideEffects String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  interactionsAsA DrugInteraction[] @relation("DrugA")
+  interactionsAsB DrugInteraction[] @relation("DrugB")
+
+  @@map("drugs")
+}
+
+model DrugInteraction {
+  id          String   @id @default(cuid())
+  drugAId     String
+  drugBId     String
+  drugA       Drug     @relation("DrugA", fields: [drugAId], references: [id])
+  drugB       Drug     @relation("DrugB", fields: [drugBId], references: [id])
+  severity    String
+  description String
+  mechanism   String?
+  evidence    String?
+  source      String   @default("DrugBank")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  knowledgeChunks KnowledgeChunk[]
+
+  @@unique([drugAId, drugBId])
+  @@map("drug_interactions")
+}
+
+model KnowledgeChunk {
+  id            String           @id @default(cuid())
+  content       String
+  chunkType     String
+  drugNames     Json             @default("[]")
+  severity      String?
+  interactionId String?
+  interaction   DrugInteraction? @relation(fields: [interactionId], references: [id])
+  embedding     Json?
+  createdAt     DateTime         @default(now())
+
+  @@map("knowledge_chunks")
+}
+
+model Report {
+  id               String       @id @default(cuid())
+  prescriptionId   String       @unique
+  prescription     Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  userId           String
+  drugs            Json
+  classifications  Json
+  summary          Json
+  narrative        String
+  overallRisk      String
+  actionItems      Json
+  generatedAt      DateTime     @default(now())
+
+  @@map("reports")
+}
